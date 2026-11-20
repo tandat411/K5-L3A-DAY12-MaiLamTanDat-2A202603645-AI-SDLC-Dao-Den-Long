@@ -185,11 +185,96 @@
       color: #F5F1E6;
       border: 1px solid rgba(255, 255, 255, 0.3);
     }
+
+    /* Accessibility: Large text option (x1.25, >= 18px) */
+    body.large-font { font-size: 20px; }
+    body.large-font .hud-box { padding: 12px 20px; }
+    body.large-font .hud-value { font-size: 26px; }
+    body.large-font .hud-label { font-size: 14px; }
+    body.large-font .btn { font-size: 18px; padding: 12px 32px; }
+    body.large-font #prompt-banner { font-size: 18px; }
+
+    /* Accessibility Subtitles & Alerts */
+    #subtitle-box {
+      position: absolute;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(14, 20, 48, 0.95);
+      border: 2px solid #F2C14E;
+      color: #F5F1E6;
+      padding: 8px 24px;
+      border-radius: 24px;
+      font-size: 18px;
+      font-weight: bold;
+      display: none;
+      pointer-events: none;
+      z-index: 50;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      text-align: center;
+    }
+
+    #shade-arrow {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      display: none;
+      pointer-events: none;
+      z-index: 50;
+      font-size: 32px;
+      line-height: 40px;
+      text-align: center;
+      color: #FF5A5F;
+      text-shadow: 0 0 10px rgba(255, 90, 95, 0.9);
+      user-select: none;
+    }
+
+    /* Leaderboard & Settings Tables */
+    .table-lb {
+      width: 100%;
+      max-width: 540px;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 15px;
+    }
+    .table-lb th, .table-lb td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .table-lb th { color: #F2C14E; }
+
+    .keybind-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      max-width: 420px;
+      margin: 4px 0;
+    }
+    .keybind-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid #F2C14E;
+      color: #FFE9B0;
+      padding: 4px 12px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      min-width: 80px;
+      text-align: center;
+    }
+    .keybind-btn.recording {
+      background: #FF5A5F;
+      color: #fff;
+      animation: pulse-danger 0.5s infinite alternate;
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
   <div id="canvas-container"></div>
+  <div id="subtitle-box"></div>
+  <div id="shade-arrow">▲</div>
 
   <!-- HUD -->
   <div id="hud-top-left">
@@ -241,10 +326,15 @@
   <div id="menu-overlay" class="screen-overlay" style="display: flex;">
     <h1 id="menu-title">Đảo Đèn Lồng</h1>
     <p id="menu-desc">Chào mừng Mây. Hãy chọn Đêm để bắt đầu thắp sáng hòn đảo giữa sương đen.</p>
-    <div>
+    <div style="margin-bottom: 12px;">
       <button class="btn" id="btn-night-1">Đêm 1: Đảo Bến</button>
       <button class="btn" id="btn-night-2">Đêm 2: Đảo Cau</button>
       <button class="btn" id="btn-night-3">Đêm 3: Đảo Chuông</button>
+    </div>
+    <div>
+      <button class="btn btn-secondary" id="btn-open-lb">🏆 Bảng Xếp Hạng</button>
+      <button class="btn btn-secondary" id="btn-open-settings">⚙️ Cài Đặt & Trợ Năng</button>
+      <button class="btn btn-secondary" id="btn-run-bench">⚡ Chạy Benchmark 30s</button>
     </div>
   </div>
 
@@ -252,14 +342,57 @@
     <h1>Tạm Dừng</h1>
     <p>Game đang tạm dừng logic. Nhấn ESC hoặc P để tiếp tục.</p>
     <button class="btn" id="btn-resume">Tiếp Tục</button>
-    <button class="btn btn-secondary" id="btn-colorblind">Chế Độ Mù Màu: TẮT</button>
+    <button class="btn btn-secondary" id="btn-pause-settings">⚙️ Cài Đặt & Đổi Phím</button>
     <button class="btn btn-secondary" id="btn-restart-night">Chơi Lại Đêm Này</button>
     <button class="btn btn-secondary" id="btn-to-menu">Về Menu Chọn Đêm</button>
+  </div>
+
+  <div id="leaderboard-overlay" class="screen-overlay" style="display: none;">
+    <h1>Bảng Xếp Hạng Cục Bộ</h1>
+    <p>Top 10 Người Giữ Đèn Xuất Sắc Nhất</p>
+    <table class="table-lb">
+      <thead>
+        <tr>
+          <th>Hạng</th>
+          <th>Tên</th>
+          <th>Điểm</th>
+          <th>Đêm Thắng</th>
+          <th>Thời Gian</th>
+        </tr>
+      </thead>
+      <tbody id="lb-table-body"></tbody>
+    </table>
+    <button class="btn" id="btn-close-lb">Đóng</button>
+  </div>
+
+  <div id="settings-overlay" class="screen-overlay" style="display: none;">
+    <h1>Cài Đặt & Trợ Năng</h1>
+    <p>Tùy chỉnh phím điều khiển và các tính năng hỗ trợ tiếp cận</p>
+    <div style="max-height: 48vh; overflow-y: auto; width: 100%; max-width: 460px; padding: 0 10px;">
+      <div id="keybind-list"></div>
+      <div id="keybind-alert" style="color: #FF5A5F; font-size: 13px; margin: 8px 0; display: none;"></div>
+      <div style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
+        <button class="btn btn-secondary" id="btn-toggle-colorblind">Chế Độ Mù Màu: TẮT</button>
+        <button class="btn btn-secondary" id="btn-toggle-reduced-motion">Giảm Chuyển Động: TẮT</button>
+        <button class="btn btn-secondary" id="btn-toggle-large-font">Cỡ Chữ Lớn: TẮT</button>
+      </div>
+    </div>
+    <div style="margin-top: 16px;">
+      <button class="btn btn-secondary" id="btn-reset-keybinds">Khôi Phục Mặc Định</button>
+      <button class="btn" id="btn-close-settings">Lưu & Đóng</button>
+    </div>
   </div>
 
   <div id="gameover-overlay" class="screen-overlay" style="display: none;">
     <h1 id="go-title">Kết Quả</h1>
     <p id="go-desc"></p>
+    <div id="name-submit-box" style="margin-bottom: 20px;">
+      <p style="font-size: 14px; margin-bottom: 8px;">Nhập tên lưu vào Bảng Xếp Hạng (3–12 ký tự):</p>
+      <input type="text" id="input-player-name" maxlength="12" placeholder="Ten_Cua_May"
+        style="padding: 8px 16px; border-radius: 12px; border: 1px solid #F2C14E; background: rgba(0,0,0,0.5); color: #fff; font-size: 15px; text-align: center;">
+      <button class="btn btn-secondary" id="btn-save-score">Lưu Điểm</button>
+      <div id="name-save-msg" style="font-size: 13px; margin-top: 6px;"></div>
+    </div>
     <button class="btn" id="btn-next-or-retry">Tiếp Tục</button>
   </div>
 
@@ -409,18 +542,200 @@
     const drifterMeshMap = new Map();
     const charmMeshMap = new Map();
 
+    // Accessibility & Settings States
     let colorblindMode = localStorage.getItem('dao_colorblind') === 'true';
+    let reducedMotion = localStorage.getItem('dao_reduced_motion') === 'true';
+    let largeFont = localStorage.getItem('dao_large_font') === 'true';
 
-    function updateColorblindUI() {
-      const btn = document.getElementById('btn-colorblind');
-      if (btn) btn.textContent = `Chế Độ Mù Màu: ${colorblindMode ? 'BẬT' : 'TẮT'}`;
+    if (largeFont) document.body.classList.add('large-font');
+
+    const DEFAULT_KEYBINDS = {
+      move_up: 'KeyW',
+      move_down: 'KeyS',
+      move_left: 'KeyA',
+      move_right: 'KeyD',
+      jump: 'Space',
+      dash: 'ShiftLeft',
+      interact: 'KeyE',
+      pulse: 'KeyF',
+      pause: 'Escape'
+    };
+
+    let keybinds = { ...DEFAULT_KEYBINDS };
+    try {
+      const savedKeys = localStorage.getItem('dao_keybinds');
+      if (savedKeys) keybinds = { ...DEFAULT_KEYBINDS, ...JSON.parse(savedKeys) };
+    } catch (e) {}
+
+    const KEY_LABELS = {
+      move_up: 'Di chuyển Tiến',
+      move_down: 'Di chuyển Lùi',
+      move_left: 'Di chuyển Trái',
+      move_right: 'Di chuyển Phải',
+      jump: 'Nhảy',
+      dash: 'Lướt',
+      interact: 'Tương tác Đèn',
+      pulse: 'Tỏa Sáng',
+      pause: 'Tạm Dừng'
+    };
+
+    function updateAccessibilityUI() {
+      const btnCb = document.getElementById('btn-toggle-colorblind');
+      if (btnCb) btnCb.textContent = `Chế Độ Mù Màu: ${colorblindMode ? 'BẬT' : 'TẮT'}`;
+      const btnRm = document.getElementById('btn-toggle-reduced-motion');
+      if (btnRm) btnRm.textContent = `Giảm Chuyển Động: ${reducedMotion ? 'BẬT' : 'TẮT'}`;
+      const btnLf = document.getElementById('btn-toggle-large-font');
+      if (btnLf) btnLf.textContent = `Cỡ Chữ Lớn: ${largeFont ? 'BẬT' : 'TẮT'}`;
     }
-    updateColorblindUI();
+    updateAccessibilityUI();
 
-    document.getElementById('btn-colorblind').onclick = () => {
+    document.getElementById('btn-toggle-colorblind').onclick = () => {
       colorblindMode = !colorblindMode;
       localStorage.setItem('dao_colorblind', String(colorblindMode));
-      updateColorblindUI();
+      updateAccessibilityUI();
+      syncLanterns(performance.now());
+    };
+    document.getElementById('btn-toggle-reduced-motion').onclick = () => {
+      reducedMotion = !reducedMotion;
+      localStorage.setItem('dao_reduced_motion', String(reducedMotion));
+      updateAccessibilityUI();
+    };
+    document.getElementById('btn-toggle-large-font').onclick = () => {
+      largeFont = !largeFont;
+      localStorage.setItem('dao_large_font', String(largeFont));
+      document.body.classList.toggle('large-font', largeFont);
+      updateAccessibilityUI();
+    };
+
+    // Keybind UI Renderer
+    let recordingAction = null;
+    function renderKeybindList() {
+      const container = document.getElementById('keybind-list');
+      container.innerHTML = '';
+      for (const [action, key] of Object.entries(keybinds)) {
+        const row = document.createElement('div');
+        row.className = 'keybind-row';
+        const lbl = document.createElement('span');
+        lbl.textContent = KEY_LABELS[action] || action;
+        const btn = document.createElement('button');
+        btn.className = `keybind-btn ${recordingAction === action ? 'recording' : ''}`;
+        btn.textContent = recordingAction === action ? 'Bấm phím mới...' : key;
+        btn.onclick = () => {
+          recordingAction = action;
+          document.getElementById('keybind-alert').style.display = 'none';
+          renderKeybindList();
+        };
+        row.appendChild(lbl);
+        row.appendChild(btn);
+        container.appendChild(row);
+      }
+    }
+    renderKeybindList();
+
+    document.getElementById('btn-reset-keybinds').onclick = () => {
+      keybinds = { ...DEFAULT_KEYBINDS };
+      localStorage.setItem('dao_keybinds', JSON.stringify(keybinds));
+      recordingAction = null;
+      document.getElementById('keybind-alert').style.display = 'none';
+      renderKeybindList();
+    };
+
+    // Leaderboard System
+    const DEFAULT_LEADERBOARD = [
+      { name: "NguoiGiuDen", score: 1850, nights_won: 3, achieved_at: "2026-11-20T14:30:00+07:00", seed: 42 },
+      { name: "May_Nho", score: 1420, nights_won: 3, achieved_at: "2026-11-20T15:00:00+07:00", seed: 100 },
+      { name: "DaoBen_Hero", score: 980, nights_won: 2, achieved_at: "2026-11-20T15:15:00+07:00", seed: 7 },
+      { name: "DomDom_Master", score: 750, nights_won: 1, achieved_at: "2026-11-20T15:30:00+07:00", seed: 2026 }
+    ];
+
+    function getLocalLeaderboard() {
+      try {
+        const raw = localStorage.getItem('dao_leaderboard');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch (e) {}
+      return [...DEFAULT_LEADERBOARD];
+    }
+
+    function saveLocalLeaderboard(entries) {
+      const sorted = [...entries].sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return new Date(a.achieved_at) - new Date(b.achieved_at);
+      }).slice(0, 10);
+      localStorage.setItem('dao_leaderboard', JSON.stringify(sorted));
+      return sorted;
+    }
+
+    function renderLeaderboardTable() {
+      const entries = getLocalLeaderboard();
+      const tbody = document.getElementById('lb-table-body');
+      tbody.innerHTML = '';
+      entries.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        const dt = new Date(item.achieved_at);
+        const timeStr = `${dt.getHours().toString().padStart(2, '0')}:${dt.getMinutes().toString().padStart(2, '0')} ${dt.getDate()}/${dt.getMonth()+1}`;
+        tr.innerHTML = `
+          <td><strong>#${idx + 1}</strong></td>
+          <td style="color: #FFE9B0;">${item.name}</td>
+          <td><strong>${item.score}</strong></td>
+          <td>${item.nights_won} / 3</td>
+          <td style="font-size: 12px; color: #bbb;">${timeStr}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Modal navigation
+    document.getElementById('btn-open-lb').onclick = () => {
+      renderLeaderboardTable();
+      document.getElementById('leaderboard-overlay').style.display = 'flex';
+    };
+    document.getElementById('btn-close-lb').onclick = () => {
+      document.getElementById('leaderboard-overlay').style.display = 'none';
+    };
+    document.getElementById('btn-open-settings').onclick = () => {
+      renderKeybindList();
+      updateAccessibilityUI();
+      document.getElementById('settings-overlay').style.display = 'flex';
+    };
+    document.getElementById('btn-pause-settings').onclick = () => {
+      renderKeybindList();
+      updateAccessibilityUI();
+      document.getElementById('settings-overlay').style.display = 'flex';
+    };
+    document.getElementById('btn-close-settings').onclick = () => {
+      document.getElementById('settings-overlay').style.display = 'none';
+    };
+    document.getElementById('btn-run-bench').onclick = () => {
+      window.location.search = '?bench=true';
+    };
+
+    // Save score in GameOver screen
+    document.getElementById('btn-save-score').onclick = () => {
+      const input = document.getElementById('input-player-name');
+      const msg = document.getElementById('name-save-msg');
+      const val = input.value.trim();
+      const regex = /^[A-Za-z0-9_]{3,12}$/;
+      if (!regex.test(val)) {
+        msg.style.color = '#FF5A5F';
+        msg.textContent = 'Tên phải từ 3–12 ký tự [A-Za-z0-9_]!';
+        return;
+      }
+      const curLb = getLocalLeaderboard();
+      const nightsWon = engine.state === 'won' ? currentNight : currentNight - 1;
+      curLb.push({
+        name: val,
+        score: engine.score,
+        nights_won: Math.max(0, nightsWon),
+        achieved_at: new Date().toISOString(),
+        seed: engine.seed || 42
+      });
+      saveLocalLeaderboard(curLb);
+      msg.style.color = '#10B981';
+      msg.textContent = '✓ Đã lưu vào Bảng Xếp Hạng!';
+      document.getElementById('btn-save-score').disabled = true;
     };
 
     function syncLanterns(now = 0) {
@@ -487,10 +802,35 @@
     // Keyboard handlers
     const keys = {};
     window.addEventListener('keydown', (e) => {
+      if (recordingAction) {
+        for (const [action, key] of Object.entries(keybinds)) {
+          if (action !== recordingAction && key === e.code) {
+            const alertEl = document.getElementById('keybind-alert');
+            alertEl.style.display = 'block';
+            alertEl.textContent = `⚠️ Phím ${e.code} đã được gán cho "${KEY_LABELS[action]}"!`;
+            return;
+          }
+        }
+        keybinds[recordingAction] = e.code;
+        localStorage.setItem('dao_keybinds', JSON.stringify(keybinds));
+        recordingAction = null;
+        document.getElementById('keybind-alert').style.display = 'none';
+        renderKeybindList();
+        e.preventDefault();
+        return;
+      }
+
       keys[e.code] = true;
-      if (e.code === 'Escape' || e.code === 'KeyP') {
+      if (e.code === (keybinds.pause || 'Escape') || e.code === 'KeyP') {
         const menuOverlay = document.getElementById('menu-overlay');
-        if (menuOverlay && menuOverlay.style.display === 'flex') return;
+        const settingsOverlay = document.getElementById('settings-overlay');
+        const lbOverlay = document.getElementById('leaderboard-overlay');
+        if (
+          (menuOverlay && menuOverlay.style.display === 'flex') ||
+          (settingsOverlay && settingsOverlay.style.display === 'flex') ||
+          (lbOverlay && lbOverlay.style.display === 'flex')
+        ) return;
+
         const pauseOverlay = document.getElementById('pause-overlay');
         const isPaused = pauseOverlay.style.display === 'flex';
         pauseOverlay.style.display = isPaused ? 'none' : 'flex';
@@ -499,7 +839,7 @@
     });
     window.addEventListener('keyup', (e) => {
       keys[e.code] = false;
-      if (e.code === 'Escape' || e.code === 'KeyP') {
+      if (e.code === (keybinds.pause || 'Escape') || e.code === 'KeyP') {
         engine.applyInputFrame({ pause: false });
       }
     });
@@ -554,21 +894,23 @@
       accumulator += delta;
 
       while (accumulator >= dt) {
-        const isMenuOpen = document.getElementById('menu-overlay').style.display === 'flex';
+        const isMenuOpen = document.getElementById('menu-overlay').style.display === 'flex' ||
+                           document.getElementById('settings-overlay').style.display === 'flex' ||
+                           document.getElementById('leaderboard-overlay').style.display === 'flex';
         if (engine.state === 'playing' && !engine.paused && !isMenuOpen) {
           let mx = 0, mz = 0;
-          if (keys['KeyW'] || keys['ArrowUp']) mz += 1;
-          if (keys['KeyS'] || keys['ArrowDown']) mz -= 1;
-          if (keys['KeyA'] || keys['ArrowLeft']) mx += 1;
-          if (keys['KeyD'] || keys['ArrowRight']) mx -= 1;
+          if (keys[keybinds.move_up] || keys['KeyW'] || keys['ArrowUp']) mz += 1;
+          if (keys[keybinds.move_down] || keys['KeyS'] || keys['ArrowDown']) mz -= 1;
+          if (keys[keybinds.move_left] || keys['KeyA'] || keys['ArrowLeft']) mx += 1;
+          if (keys[keybinds.move_right] || keys['KeyD'] || keys['ArrowRight']) mx -= 1;
 
           engine.applyInputFrame({
             move: [mx, mz],
             cam_yaw_deg: 0,
-            jump: Boolean(keys['Space']),
-            dash: Boolean(keys['ShiftLeft'] || keys['KeyL']),
-            interact: Boolean(keys['KeyE']),
-            pulse: Boolean(keys['KeyF'])
+            jump: Boolean(keys[keybinds.jump] || keys['Space']),
+            dash: Boolean(keys[keybinds.dash] || keys['ShiftLeft'] || keys['KeyL']),
+            interact: Boolean(keys[keybinds.interact] || keys['KeyE']),
+            pulse: Boolean(keys[keybinds.pulse] || keys['KeyF'])
           });
 
           const events = engine.step();
@@ -734,6 +1076,54 @@
       document.getElementById('val-pulse-cd').textContent =
         engine.player.pulse_cd_ticks > 0 ? `${(engine.player.pulse_cd_ticks / 60).toFixed(1)}s` : 'Sẵn sàng';
 
+      // Visual Subtitles & Alerts (Accessibility)
+      const subBox = document.getElementById('subtitle-box');
+      let subText = '';
+      if (engine.time_left_s <= 10 && engine.time_left_s > 0) {
+        subText = `⏳ Còn ${Math.ceil(engine.time_left_s)} giây cuối!`;
+      } else {
+        const lowL = engine.lanterns.find((l) => l.lit && l.fuel < 30);
+        if (lowL) {
+          subText = `🏮 Cảnh báo: Đèn ${lowL.id} sắp cạn dầu (<30%)!`;
+        } else if (currentNight === 3 && engine.wind && engine.wind.gust_timer < 60) {
+          subText = `⚠️ Gió mạnh sắp nổi!`;
+        }
+      }
+      if (subText) {
+        subBox.style.display = 'block';
+        subBox.textContent = subText;
+      } else {
+        subBox.style.display = 'none';
+      }
+
+      // Shade Edge Arrow Indicator
+      const arrowEl = document.getElementById('shade-arrow');
+      let nearestChaseShade = null;
+      let minShadeDist = Infinity;
+      for (const s of engine.shades) {
+        if (s.state === 'chase') {
+          const d = dist2D(engine.player.pos, s.pos);
+          if (d < minShadeDist) {
+            minShadeDist = d;
+            nearestChaseShade = s;
+          }
+        }
+      }
+      if (nearestChaseShade && minShadeDist <= 18) {
+        arrowEl.style.display = 'block';
+        const dx = nearestChaseShade.pos[0] - engine.player.pos[0];
+        const dz = nearestChaseShade.pos[2] - engine.player.pos[2];
+        const angle = Math.atan2(dz, dx);
+        const screenCenterX = window.innerWidth / 2;
+        const screenCenterY = window.innerHeight / 2;
+        const radius = Math.min(screenCenterX, screenCenterY) - 50;
+        arrowEl.style.left = `${screenCenterX + radius * Math.cos(angle)}px`;
+        arrowEl.style.top = `${screenCenterY + radius * Math.sin(angle)}px`;
+        arrowEl.style.transform = `translate(-50%, -50%) rotate(${angle + Math.PI / 2}rad)`;
+      } else {
+        arrowEl.style.display = 'none';
+      }
+
       // Check GameOver UI
       if (engine.state !== 'playing' && !engine.paused) {
         const goOverlay = document.getElementById('gameover-overlay');
@@ -743,6 +1133,11 @@
 
         if (goOverlay.style.display !== 'flex') {
           goOverlay.style.display = 'flex';
+          const nameMsg = document.getElementById('name-save-msg');
+          if (nameMsg) nameMsg.textContent = '';
+          const btnSave = document.getElementById('btn-save-score');
+          if (btnSave) btnSave.disabled = false;
+
           if (engine.state === 'won') {
             goTitle.textContent = currentNight === 3 ? '🌅 Bình Minh Trên Đảo Đèn Lồng 🌅' : `🌟 Hoàn Thành Đêm ${currentNight}! 🌟`;
             goDesc.textContent = `Tuyệt vời! Tổng điểm đạt được: ${engine.score} điểm.`;
@@ -761,6 +1156,13 @@
       }
 
       renderer.render(scene, camera);
+    }
+
+    // Benchmark mode trigger via ?bench=true
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('bench') === 'true') {
+      document.getElementById('menu-overlay').style.display = 'none';
+      console.log('Chế độ Benchmark Web Three.js đang chạy...');
     }
 
     window.addEventListener('resize', () => {

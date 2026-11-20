@@ -1,0 +1,32 @@
+{
+  "entries": [
+    {
+      "name": "NguoiGiuDen",
+      "score": 1850,
+      "nights_won": 3,
+      "achieved_at": "2026-11-20T14:30:00+07:00",
+      "seed": 42
+    },
+    {
+      "name": "May_Nho",
+      "score": 1420,
+      "nights_won": 3,
+      "achieved_at": "2026-11-20T15:00:00+07:00",
+      "seed": 100
+    },
+    {
+      "name": "DaoBen_Hero",
+      "score": 980,
+      "nights_won": 2,
+      "achieved_at": "2026-11-20T15:15:00+07:00",
+      "seed": 7
+    },
+    {
+      "name": "DomDom_Master",
+      "score": 750,
+      "nights_won": 1,
+      "achieved_at": "2026-11-20T15:30:00+07:00",
+      "seed": 2026
+    }
+  ]
+}

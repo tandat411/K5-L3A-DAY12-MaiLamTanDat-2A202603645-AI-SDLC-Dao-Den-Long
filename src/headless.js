@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { GameEngine } from './engine.js';
+import { exportLeaderboard } from './leaderboard.js';
 
 function parseArgs(argv) {
   const args = {
@@ -14,7 +15,8 @@ function parseArgs(argv) {
     inputs: null,
     ticks: 60,
     out: null,
-    snapshot_every: 10
+    snapshot_every: 10,
+    export_leaderboard: null
   };
 
   for (let i = 2; i < argv.length; i++) {
@@ -33,6 +35,8 @@ function parseArgs(argv) {
       args.out = argv[++i];
     } else if (arg === '--snapshot-every' && i + 1 < argv.length) {
       args.snapshot_every = parseInt(argv[++i], 10);
+    } else if (arg === '--export-leaderboard' && i + 1 < argv.length) {
+      args.export_leaderboard = argv[++i];
     }
   }
 
@@ -52,6 +56,11 @@ function loadJsonFile(filePath) {
 
 function main() {
   const args = parseArgs(process.argv);
+
+  if (args.export_leaderboard) {
+    exportLeaderboard(args.export_leaderboard);
+    process.exit(0);
+  }
 
   if (!args.out) {
     process.stderr.write('Missing required argument: --out <file.jsonl>\n');
