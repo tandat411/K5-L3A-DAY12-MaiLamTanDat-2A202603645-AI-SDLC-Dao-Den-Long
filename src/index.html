@@ -477,6 +477,15 @@
     // Menu handlers
     function startNight(n) {
       currentNight = n;
+      moteMeshMap.forEach((m) => scene.remove(m));
+      moteMeshMap.clear();
+      shadeMeshMap.forEach((m) => scene.remove(m));
+      shadeMeshMap.clear();
+      drifterMeshMap.forEach((m) => scene.remove(m));
+      drifterMeshMap.clear();
+      charmMeshMap.forEach((m) => scene.remove(m));
+      charmMeshMap.clear();
+
       engine = new GameEngine({ night: currentNight });
       buildMap(currentNight);
       syncLanterns();
@@ -553,6 +562,13 @@
       syncLanterns();
 
       // Sync Motes
+      const activeMoteIds = new Set(engine.motes.map((m) => m.id));
+      for (const [id, mesh] of moteMeshMap.entries()) {
+        if (!activeMoteIds.has(id)) {
+          scene.remove(mesh);
+          moteMeshMap.delete(id);
+        }
+      }
       for (const m of engine.motes) {
         let mesh = moteMeshMap.get(m.id);
         if (!mesh) {
@@ -563,11 +579,17 @@
           scene.add(mesh);
           moteMeshMap.set(m.id, mesh);
         }
-        mesh.visible = true;
         mesh.position.set(m.pos[0], m.pos[1] + 0.35 + Math.sin(now * 0.005 + m.pos[0]) * 0.1, m.pos[2]);
       }
 
       // Sync Shades
+      const activeShadeIds = new Set(engine.shades.map((s) => s.id));
+      for (const [id, mesh] of shadeMeshMap.entries()) {
+        if (!activeShadeIds.has(id)) {
+          scene.remove(mesh);
+          shadeMeshMap.delete(id);
+        }
+      }
       for (const s of engine.shades) {
         let mesh = shadeMeshMap.get(s.id);
         if (!mesh) {
@@ -579,6 +601,44 @@
           shadeMeshMap.set(s.id, mesh);
         }
         mesh.position.set(s.pos[0], s.pos[1] + 0.7, s.pos[2]);
+      }
+
+      // Sync Charms (Bùa Gió)
+      for (const c of engine.charms) {
+        let mesh = charmMeshMap.get(c.id);
+        if (!mesh) {
+          mesh = new THREE.Mesh(
+            new THREE.BoxGeometry(0.6, 0.9, 0.1),
+            new THREE.MeshStandardMaterial({ color: 0xC8102E, emissive: 0xF2C14E, emissiveIntensity: 0.4 })
+          );
+          scene.add(mesh);
+          charmMeshMap.set(c.id, mesh);
+        }
+        mesh.visible = c.available;
+        mesh.position.set(c.pos[0], c.pos[1] + 0.6, c.pos[2]);
+        mesh.rotation.y = now * 0.002;
+      }
+
+      // Sync Drifters (Gió Lạc)
+      const activeDrifterIds = new Set(engine.drifters.map((d) => d.id));
+      for (const [id, mesh] of drifterMeshMap.entries()) {
+        if (!activeDrifterIds.has(id)) {
+          scene.remove(mesh);
+          drifterMeshMap.delete(id);
+        }
+      }
+      for (const d of engine.drifters) {
+        let mesh = drifterMeshMap.get(d.id);
+        if (!mesh) {
+          mesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.1, 0.4, 1.2, 12),
+            new THREE.MeshStandardMaterial({ color: 0x8FA3B8, transparent: true, opacity: 0.85 })
+          );
+          scene.add(mesh);
+          drifterMeshMap.set(d.id, mesh);
+        }
+        mesh.position.set(d.pos[0], d.pos[1], d.pos[2]);
+        mesh.rotation.z = Math.sin(now * 0.005) * 0.3;
       }
 
       // HUD Update
