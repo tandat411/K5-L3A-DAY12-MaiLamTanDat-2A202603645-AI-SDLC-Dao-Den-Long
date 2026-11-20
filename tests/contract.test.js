@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 
-test('Test Contract v1.0: Mote Pickup Scenario', () => {
+test('Test Contract v1.1: Mote Pickup Scenario', () => {
   const outPath = 'tests/output_pickup.jsonl';
   if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
 
@@ -36,7 +36,7 @@ test('Test Contract v1.0: Mote Pickup Scenario', () => {
   assert.equal(endLine.state, 'playing');
 });
 
-test('Test Contract v1.0: Deposit and Win Scenario', () => {
+test('Test Contract v1.1: Deposit and Win Scenario (Ticket-02 lantern_cost = 10)', () => {
   const outPath = 'tests/output_deposit.jsonl';
   if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
 
@@ -52,7 +52,8 @@ test('Test Contract v1.0: Deposit and Win Scenario', () => {
   const depEvt = objects.find((o) => o.type === 'event' && o.name === 'deposit');
   assert.ok(depEvt, 'deposit event should be emitted');
   assert.equal(depEvt.data.lantern_id, 'L1');
-  assert.equal(depEvt.data.amount, 3);
+  // Ticket-02 standard numbers: lantern_cost is now 10 motes
+  assert.equal(depEvt.data.amount, 10);
 
   const litEvt = objects.find(
     (o) => o.type === 'event' && o.name === 'lantern_lit'
@@ -72,7 +73,7 @@ test('Test Contract v1.0: Deposit and Win Scenario', () => {
   assert.ok(endLine.score > 100);
 });
 
-test('Test Contract v1.0: Pulse Stuns Shade Scenario', () => {
+test('Test Contract v1.1: Pulse Stuns Shade Scenario (Ticket-02 pulse_cost = 3)', () => {
   const outPath = 'tests/output_pulse.jsonl';
   if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
 
@@ -97,7 +98,7 @@ test('Test Contract v1.0: Pulse Stuns Shade Scenario', () => {
   assert.ok(lateSnap.shades[0].pos[2] > 4.0, 'Shade should be pushed back');
 });
 
-test('Test Contract v1.0: Determinism across runs', () => {
+test('Test Contract v1.1: Determinism across runs', () => {
   const out1 = 'tests/out_det1.jsonl';
   const out2 = 'tests/out_det2.jsonl';
 
@@ -118,7 +119,7 @@ test('Test Contract v1.0: Determinism across runs', () => {
   );
 });
 
-test('Test Contract v1.0: Error exit code 2 on invalid JSON input', () => {
+test('Test Contract v1.1: Error exit code 2 on invalid JSON input', () => {
   const badPath = 'tests/bad.json';
   fs.writeFileSync(badPath, '{ invalid json');
   try {

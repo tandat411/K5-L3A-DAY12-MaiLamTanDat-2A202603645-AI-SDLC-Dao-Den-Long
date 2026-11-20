@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// src/headless.js — Test Contract v1.0 Runner
+// src/headless.js — Test Contract v1.1 Runner
 // Karpathy Guidelines: Direct CLI parsing, robust exit codes, deterministic JSONL stream
 
 import fs from 'node:fs';
@@ -85,6 +85,7 @@ function main() {
 
   const engine = new GameEngine({
     seed: args.seed,
+    night: args.night,
     tuning,
     scenario: scenarioData
   });
@@ -94,10 +95,19 @@ function main() {
   // Snapshot tick 0
   outLines.push(JSON.stringify(engine.getSnapshot()));
 
-  // Index input frames by tick for fast lookup
-  let frameIdx = 0;
+  // Emit night_start event at tick 0 if not custom scenario or if standard run
+  outLines.push(
+    JSON.stringify({
+      type: 'event',
+      tick: 0,
+      name: 'night_start',
+      data: { night: args.night }
+    })
+  );
 
+  let frameIdx = 0;
   const totalTicks = args.ticks;
+
   for (let step = 0; step < totalTicks; step++) {
     // Current tick before step is step
     while (frameIdx < inputFrames.length && inputFrames[frameIdx].tick <= step) {
@@ -117,8 +127,8 @@ function main() {
       outLines.push(JSON.stringify(engine.getSnapshot()));
     }
 
-    // If game ended, stop simulation early
-    if (engine.state !== 'playing') {
+    // If game ended, stop simulation
+    if (engine.state !== 'playing' && engine.state !== 'paused') {
       break;
     }
   }

@@ -1,43 +1,40 @@
-# Tài Liệu Giả Định Kỹ Thuật (Assumptions) — Phase 1: PRD-0
+# Tài Liệu Giả Định Kỹ Thuật (Assumptions) & Acceptance Criteria — Phase 2
 
-Dưới đây là các giả định thiết kế và kỹ thuật được xác định rõ ràng theo nguyên tắc Karpathy trước khi code:
+## 1. Acceptance Criteria theo Ticket-02 (DoD)
+- **AC-1 (Di chuyển, Nhảy & Lướt):**
+  - Tốc độ chạy 6.0 m/s (khi có Bùa Gió: 7.2 m/s).
+  - Nhảy: $v_y = 7.0$ m/s, $g = -20$ m/s², chỉ nhảy khi grounded.
+  - Lướt: 14 m/s trong 12 ticks (0.2s), hồi chiêu 90 ticks (1.5s). Lướt trên không giữ nguyên độ cao ($v_y = 0$). Có Bùa Gió hồi chiêu = 0.
+- **AC-2 (Đom đóm & Đèn lồng):**
+  - Sức chứa 10 đom đóm. Nhặt khi $XZ \le 1.0$m và $|Y_{player} - Y_{mote}| \le 1.5$m.
+  - Đèn cần 10 đom đóm. Tương tác trong 2.0m. Chọn đèn gần nhất chưa thắp.
+  - Vùng an toàn 6m quanh đèn sáng: Bóng Mực không thể tiến vào.
+- **AC-3 (Tỏa Sáng):**
+  - Tốn 3 đom đóm, hồi chiêu 3s (180 ticks), bán kính 3D $\le 5.0$m từ tâm $(pos.x, pos.y + 0.8, pos.z)$.
+  - Choáng 120 ticks, 15 ticks đầu bị đẩy tổng 4m. Cộng +5 điểm/quái trúng chiêu.
+- **AC-4 (Bóng Mực & Bị Đánh & Rơi Vực):**
+  - Tốc độ 4.0 m/s (Đêm 3: 4.5 m/s). Phát hiện 12m, bỏ đuổi 18m.
+  - Va chạm $XZ \le 1.0$m và $\Delta Y \le 1.5$m: Mất 1 Flame, rơi $\lfloor carried/2 \rfloor$ đom đóm ra vành 1.5–2.5m (tồn tại 480 ticks), bất tử 90 ticks, quái recoil 2m trong 60 ticks.
+  - Rơi khỏi đảo ($Y < -10$): Mất 1 Flame, mất TOÀN BỘ đom đóm (`lost: carried`). Đợi 60 ticks rồi hồi sinh tại (0,0,0), bất tử 90 ticks. Hết Flame thì thua ngay.
+- **AC-5 (Gió Lạc - Drifter):**
+  - Tối đa 2 con, xuất hiện ở Đêm 2 và 3. Tốc độ 7 m/s (idle 2 m/s).
+  - Khi Mây có $\ge 5$ đom đóm và cách $\le 15$m: đuổi.
+  - Chạm $XZ \le 1.2$m: cướp $\min(3, carried)$ đom đóm rồi flee 240 ticks.
+  - Tỏa Sáng trúng: nếu đang chase chuyển flee không cướp; nếu đang flee thả lại toàn bộ đom đóm đã cướp tại chỗ.
+- **AC-6 (Bùa Gió - Charm):**
+  - Đêm 2 tại (35,0,0); Đêm 3 tại (30,0,25) và (-30,0,25).
+  - Tác dụng 600 ticks: Tốc độ 7.2 m/s, lướt không hồi chiêu. Hồi lại sau 2700 ticks.
+- **AC-7 (Bản đồ 3 Đêm & Bục Nhảy):**
+  - Đêm 1: Đảo tròn bán kính 40m, 5 đèn.
+  - Đêm 2: Hai đảo bán kính 28m tại (0,0,0) và (70,0,0) nối bằng cầu tre $x \in [26, 44], z \in [-2, 2]$. 2 bục nhảy tại (20,0,18) và (50,0,-18) bắn Mây sang đảo đối diện ($V_y = 14$, $V_{horizontal} = 24$). 6 đèn.
+  - Đêm 3: Đảo 3 tầng (Y=0, Y=3, Y=6) bán kính 45m. Dốc tại 30° và 150°. Bục nhảy tại (0,3,13) bắn lên tầng 2 ($V_y = 12, V_z = -8$). Gió thổi mỗi 30s kéo dài 5s (đẩy 2 m/s). 7 đèn.
+- **AC-8 (Tạm dừng - Pause):**
+  - Nhấn `pause`: logic dừng, `state: "paused"`, `sim_tick` không tăng, `tick` vẫn tăng.
 
-## 1. Hệ tọa độ & Đo lường
-- Không gian 3 chiều: Trục Y hướng lên trên, mặt phẳng mặt đất đảo tại Y = 0.
-- Vị trí xuất phát của Mây: `(0, 0, 0)`.
-- Mọi phép đo khoảng cách cho va chạm và tương tác (nhặt đom đóm, nạp đèn, xua quái, va chạm quái) đều được tính trên mặt phẳng ngang XZ: $d = \sqrt{(x_1 - x_2)^2 + (z_1 - z_2)^2}$.
-- "Trong bán kính $r$": $d \le r$.
-- Tọa độ trong file output JSONL được làm tròn 3 chữ số thập phân (`toFixed(3)` / làm tròn $10^{-3}$).
-
-## 2. Thông số Gameplay (Tuning)
-- `player_speed`: 6.0 m/s (tương đương 0.1 m / tick ở 60 ticks/s).
-- `carry_capacity`: 5 (số đom đóm mang tối đa).
-- `lantern_cost`: 3 (số đom đóm cần nạp để thắp sáng 1 đèn).
-- `lantern_count_night1`: 5 đèn (L1, L2, L3, L4, L5) bố trí tròn quanh đảo ở bán kính R = 25m.
-- `pickup_radius`: 1.5m. Khi Mây bước vào phạm vi đom đóm và túi chưa đầy (`carried < carry_capacity`), đom đóm tự động được nhặt.
-- `interact_radius`: 2.5m quanh chân đèn. Khi nhấn `interact` (rising edge false -> true), Mây nạp toàn bộ số đom đóm đang mang vào đèn cho đến khi đủ `lantern_cost`.
-- `pulse_cost`: 1 đom đóm. Mây phải có ít nhất 1 đom đóm đang mang để kích hoạt tỏa sáng.
-- `pulse_radius`: 6.0m. Làm choáng mọi Bóng Mực trong bán kính 6m.
-- `pulse_stun_s`: 3.0s (180 ticks).
-- `pulse_push_m`: 3.0m (đẩy lùi Bóng Mực ra xa Mây thêm 3m).
-- `pulse_cooldown_s`: 1.0s (60 ticks).
-- `night1_duration_s`: 180s (3 phút).
-- `flames`: 3 (máu khởi điểm của Mây).
-- `invuln_s`: 2.0s (120 ticks bất tử sau khi bị Bóng Mực đánh trúng).
-- `hit_drop_ratio`: 0.5 (rơi $\lfloor carried \times 0.5 \rfloor$ đom đóm khi bị chạm).
-- `safe_radius`: 5.0m. Vùng an toàn quanh Đèn Lớn ĐÃ THẮP (`lit = true`). Bóng Mực không thể tiến vào vùng an toàn này.
-- `shade_speed`: 3.5 m/s.
-- `shade_hit_radius`: 1.0m.
-- `fall_enabled`: false (không có cơ chế rơi vực ở Phase 1).
-
-## 3. Hệ thống điểm số (Score)
-- Nhặt 1 đom đóm: +10 điểm (`per_mote: 10`).
-- Thắp sáng 1 đèn: +100 điểm (`per_lantern: 100`).
-- Làm choáng 1 Bóng Mực: +20 điểm (`per_stun: 20`).
-- Khi Thắng (all 5 lanterns lit):
-  - Cộng điểm thời gian còn lại: $\lfloor time\_left\_s \rfloor \times 1$ (`per_second_left: 1`).
-  - Cộng điểm máu còn lại: $flames \times 50$ (`per_flame_left: 50`).
-
-## 4. Tính tất định (Determinism)
-- Sử dụng thuật toán sinh số ngẫu nhiên Mulberry32 với seed nguyên từ tham số `--seed`.
-- Toàn bộ việc sinh đom đóm ngẫu nhiên, sinh Bóng Mực và ID tự sinh đều đi qua PRNG này, đảm bảo 2 lần chạy cùng seed + cùng inputs sẽ cho output giống nhau 100%.
+## 2. Thay đổi so với Phase 1 (Migration Notes)
+- `carry_capacity`: từ 5 lên 10.
+- `lantern_cost`: từ 3 lên 10.
+- `pulse_cost`: từ 1 lên 3.
+- `safe_radius`: từ 5m lên 6m.
+- `time_left_s`: Đêm 1 là 300s (thay vì 180s ở Phase 1).
+- Trạng thái Bóng Mực chuẩn hóa: `spawning`, `wander`, `chase`, `recoil`, `stunned`.
