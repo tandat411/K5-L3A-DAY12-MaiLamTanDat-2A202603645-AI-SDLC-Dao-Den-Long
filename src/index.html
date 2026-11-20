@@ -238,7 +238,7 @@
   </div>
 
   <!-- Menu / Screen Overlays -->
-  <div id="menu-overlay" class="screen-overlay" style="display: none;">
+  <div id="menu-overlay" class="screen-overlay" style="display: flex;">
     <h1 id="menu-title">Đảo Đèn Lồng</h1>
     <p id="menu-desc">Chào mừng Mây. Hãy chọn Đêm để bắt đầu thắp sáng hòn đảo giữa sương đen.</p>
     <div>
@@ -489,6 +489,8 @@
     window.addEventListener('keydown', (e) => {
       keys[e.code] = true;
       if (e.code === 'Escape' || e.code === 'KeyP') {
+        const menuOverlay = document.getElementById('menu-overlay');
+        if (menuOverlay && menuOverlay.style.display === 'flex') return;
         const pauseOverlay = document.getElementById('pause-overlay');
         const isPaused = pauseOverlay.style.display === 'flex';
         pauseOverlay.style.display = isPaused ? 'none' : 'flex';
@@ -513,10 +515,12 @@
       drifterMeshMap.clear();
       charmMeshMap.forEach((m) => scene.remove(m));
       charmMeshMap.clear();
+      lanternMeshes.forEach((m) => scene.remove(m.group));
+      lanternMeshes = [];
 
       engine = new GameEngine({ night: currentNight });
       buildMap(currentNight);
-      syncLanterns(now);
+      syncLanterns(performance.now());
       document.getElementById('lbl-night').textContent =
         currentNight === 1 ? 'Đêm 1 — Đảo Bến' : currentNight === 2 ? 'Đêm 2 — Đảo Cau' : 'Đêm 3 — Đảo Chuông';
       document.getElementById('menu-overlay').style.display = 'none';
@@ -529,7 +533,8 @@
     document.getElementById('btn-night-3').onclick = () => startNight(3);
     document.getElementById('btn-resume').onclick = () => {
       document.getElementById('pause-overlay').style.display = 'none';
-      engine.applyInputFrame({ pause: true });
+      engine.paused = false;
+      engine.applyInputFrame({ pause: false });
     };
     document.getElementById('btn-restart-night').onclick = () => startNight(currentNight);
     document.getElementById('btn-to-menu').onclick = () => {
@@ -549,7 +554,8 @@
       accumulator += delta;
 
       while (accumulator >= dt) {
-        if (engine.state === 'playing' && !engine.paused) {
+        const isMenuOpen = document.getElementById('menu-overlay').style.display === 'flex';
+        if (engine.state === 'playing' && !engine.paused && !isMenuOpen) {
           let mx = 0, mz = 0;
           if (keys['KeyW'] || keys['ArrowUp']) mz += 1;
           if (keys['KeyS'] || keys['ArrowDown']) mz -= 1;
