@@ -1,0 +1,12 @@
+{
+  "name": "dao-den-long",
+  "version": "1.0.0",
+  "description": "Đảo Đèn Lồng - Game 3D AI SDLC",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/**/*.test.js"
+  },
+  "keywords": [],
+  "author": "MaiLamTanDat",
+  "license": "MIT"
+}
