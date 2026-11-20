@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đảo Đèn Lồng — 3D Night 1 (AI SDLC)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #080a10;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      user-select: none;
+    }
+    #canvas-container { width: 100vw; height: 100vh; display: block; }
+    #hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .hud-card {
+      background: rgba(15, 20, 35, 0.75);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      border-radius: 12px;
+      padding: 12px 18px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    .hud-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #ffd166;
+      margin-bottom: 4px;
+    }
+    .hud-value {
+      font-size: 22px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #controls-hint {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 20, 35, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      padding: 8px 20px;
+      font-size: 13px;
+      color: #ddd;
+      pointer-events: none;
+      display: flex;
+      gap: 16px;
+    }
+    .key-badge {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      color: #ffd166;
+    }
+    #overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(5, 7, 15, 0.85);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    #overlay h1 {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+    #overlay p {
+      font-size: 18px;
+      color: #ccc;
+      margin-bottom: 24px;
+    }
+    #overlay button {
+      background: #ffd166;
+      color: #111;
+      border: none;
+      font-size: 16px;
+      font-weight: bold;
+      padding: 12px 32px;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.2s;
+    }
+    #overlay button:hover {
+      background: #ffe29a;
+      transform: scale(1.05);
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <div id="hud">
+    <div class="hud-card">
+      <div class="hud-title">Mây — Người Giữ Đèn</div>
+      <div class="hud-value" id="val-flames">🔥 🔥 🔥</div>
+    </div>
+    <div class="hud-card">
+      <div class="hud-title">Đom Đóm Mang Theo</div>
+      <div class="hud-value" id="val-carried">✨ 0 / 5</div>
+    </div>
+    <div class="hud-card">
+      <div class="hud-title">Đèn Lớn Đã Thắp</div>
+      <div class="hud-value" id="val-lanterns">🏮 0 / 5</div>
+    </div>
+    <div class="hud-card">
+      <div class="hud-title">Điểm & Thời Gian</div>
+      <div class="hud-value" style="font-size: 18px;" id="val-score-time">0 pts · 180s</div>
+    </div>
+  </div>
+
+  <div id="controls-hint">
+    <div><span class="key-badge">W A S D</span> Di chuyển</div>
+    <div><span class="key-badge">E</span> Nạp Đèn Lớn</div>
+    <div><span class="key-badge">Space</span> Tỏa Sáng (Tốn 1 ✨)</div>
+  </div>
+
+  <div id="overlay">
+    <h1 id="overlay-title">Chiến Thắng!</h1>
+    <p id="overlay-msg">Bạn đã thắp sáng toàn bộ hòn đảo!</p>
+    <button id="btn-restart">Chơi Lại</button>
+  </div>
+
+  <script type="module">
+    import { GameEngine, dist2D } from './engine.js';
+
+    let engine = new GameEngine();
+
+    // Three.js Scene Setup
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x060814);
+    scene.fog = new THREE.FogExp2(0x0a0d1e, 0.025);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    // Ambient & Moon Light
+    const ambientLight = new THREE.AmbientLight(0x222a44, 1.2);
+    scene.add(ambientLight);
+
+    const moonLight = new THREE.DirectionalLight(0x7e94cc, 0.8);
+    moonLight.position.set(30, 60, -30);
+    moonLight.castShadow = true;
+    scene.add(moonLight);
+
+    // Island Ground (Cylinder Island)
+    const islandRadius = 45;
+    const islandGeo = new THREE.CylinderGeometry(islandRadius, islandRadius + 4, 3, 48);
+    const islandMat = new THREE.MeshStandardMaterial({
+      color: 0x1b2820,
+      roughness: 0.85,
+      metalness: 0.1
+    });
+    const island = new THREE.Mesh(islandGeo, islandMat);
+    island.position.y = -1.5;
+    island.receiveShadow = true;
+    scene.add(island);
+
+    // Sea of clouds below island
+    const cloudGeo = new THREE.PlaneGeometry(300, 300);
+    const cloudMat = new THREE.MeshBasicMaterial({ color: 0x0f1429, transparent: true, opacity: 0.8 });
+    const cloud = new THREE.Mesh(cloudGeo, cloudMat);
+    cloud.rotation.x = -Math.PI / 2;
+    cloud.position.y = -6;
+    scene.add(cloud);
+
+    // Player Mesh (Mây: Conical hat + body + small lantern)
+    const playerGroup = new THREE.Group();
+    // Body
+    const bodyGeo = new THREE.CylinderGeometry(0.3, 0.45, 1.1, 16);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3d5a80 });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 0.55;
+    body.castShadow = true;
+    playerGroup.add(body);
+    // Conical Hat (Nón lá)
+    const hatGeo = new THREE.ConeGeometry(0.85, 0.45, 24);
+    const hatMat = new THREE.MeshStandardMaterial({ color: 0xdeb887, roughness: 0.7 });
+    const hat = new THREE.Mesh(hatGeo, hatMat);
+    hat.position.y = 1.3;
+    hat.castShadow = true;
+    playerGroup.add(hat);
+    // Small lantern on hat
+    const miniLanternGeo = new THREE.SphereGeometry(0.12, 12, 12);
+    const miniLanternMat = new THREE.MeshBasicMaterial({ color: 0xffd166 });
+    const miniLantern = new THREE.Mesh(miniLanternGeo, miniLanternMat);
+    miniLantern.position.set(0.6, 0.9, 0);
+    playerGroup.add(miniLantern);
+    // Player PointLight
+    const playerLight = new THREE.PointLight(0xffb703, 1.5, 6);
+    playerLight.position.set(0, 1.2, 0);
+    playerGroup.add(playerLight);
+
+    scene.add(playerGroup);
+
+    // Visual Lanterns
+    const lanternMeshes = [];
+    const lanternLights = [];
+    for (const lData of engine.lanterns) {
+      const g = new THREE.Group();
+      g.position.set(lData.pos[0], 0, lData.pos[2]);
+
+      // Pillar
+      const pillarGeo = new THREE.CylinderGeometry(0.25, 0.35, 3.2, 12);
+      const pillarMat = new THREE.MeshStandardMaterial({ color: 0x33272a, roughness: 0.9 });
+      const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+      pillar.position.y = 1.6;
+      pillar.castShadow = true;
+      g.add(pillar);
+
+      // Lantern Lamp (Sphere/Cylinder)
+      const lampGeo = new THREE.SphereGeometry(0.65, 16, 16);
+      const lampMat = new THREE.MeshStandardMaterial({
+        color: 0x443322,
+        emissive: 0x110800,
+        roughness: 0.4
+      });
+      const lamp = new THREE.Mesh(lampGeo, lampMat);
+      lamp.position.y = 3.3;
+      g.add(lamp);
+
+      // Light (Initially dim)
+      const light = new THREE.PointLight(0xff9e00, 0, 18);
+      light.position.set(0, 3.3, 0);
+      g.add(light);
+
+      scene.add(g);
+      lanternMeshes.push({ id: lData.id, group: g, lamp, light });
+      lanternLights.push(light);
+    }
+
+    // Visual Motes
+    const moteMeshMap = new Map();
+    const moteGeo = new THREE.SphereGeometry(0.2, 12, 12);
+    const moteMat = new THREE.MeshBasicMaterial({ color: 0xffd60a });
+
+    function syncMotes() {
+      for (const m of engine.motes) {
+        let mesh = moteMeshMap.get(m.id);
+        if (!mesh) {
+          mesh = new THREE.Mesh(moteGeo, moteMat.clone());
+          scene.add(mesh);
+          moteMeshMap.set(m.id, mesh);
+        }
+        mesh.visible = m.active;
+        if (m.active) {
+          mesh.position.set(m.pos[0], 0.4 + Math.sin(Date.now() * 0.005 + m.pos[0]) * 0.15, m.pos[2]);
+        }
+      }
+    }
+
+    // Visual Shades (Bóng Mực: dark purple ink blobs)
+    const shadeMeshMap = new Map();
+    const shadeGeo = new THREE.DodecahedronGeometry(0.7, 1);
+    const shadeMat = new THREE.MeshStandardMaterial({
+      color: 0x1b002c,
+      roughness: 0.3,
+      emissive: 0x240046,
+      emissiveIntensity: 0.6
+    });
+
+    function syncShades() {
+      for (const s of engine.shades) {
+        let mesh = shadeMeshMap.get(s.id);
+        if (!mesh) {
+          mesh = new THREE.Mesh(shadeGeo, shadeMat.clone());
+          mesh.castShadow = true;
+          scene.add(mesh);
+          shadeMeshMap.set(s.id, mesh);
+        }
+        mesh.position.set(s.pos[0], 0.7, s.pos[2]);
+        if (s.state === 'stunned') {
+          mesh.material.emissive.setHex(0x5a189a);
+          mesh.scale.set(0.8, 0.8, 0.8);
+        } else {
+          mesh.material.emissive.setHex(0x240046);
+          mesh.scale.set(1, 1, 1);
+        }
+      }
+    }
+
+    // Input Listeners
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+    });
+    window.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+    });
+
+    // Pulse wave visual effect
+    const pulseRingGeo = new THREE.RingGeometry(0.1, 0.4, 32);
+    const pulseRingMat = new THREE.MeshBasicMaterial({ color: 0xffd166, side: THREE.DoubleSide, transparent: true, opacity: 0 });
+    const pulseRing = new THREE.Mesh(pulseRingGeo, pulseRingMat);
+    pulseRing.rotation.x = -Math.PI / 2;
+    pulseRing.position.y = 0.05;
+    scene.add(pulseRing);
+    let pulseAnim = 0;
+
+    // Overlay restart button
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlay-title');
+    const overlayMsg = document.getElementById('overlay-msg');
+    document.getElementById('btn-restart').addEventListener('click', () => {
+      engine = new GameEngine();
+      overlay.style.display = 'none';
+    });
+
+    // Game Loop (Syncs logic engine at 60Hz and renders)
+    let lastTime = performance.now();
+    const dt = 1000 / 60;
+    let accumulator = 0;
+
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const delta = now - lastTime;
+      lastTime = now;
+      accumulator += delta;
+
+      while (accumulator >= dt) {
+        if (engine.state === 'playing') {
+          // Compute inputs
+          let mx = 0, mz = 0;
+          if (keys['KeyW'] || keys['ArrowUp']) mz += 1;
+          if (keys['KeyS'] || keys['ArrowDown']) mz -= 1;
+          if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1;
+          if (keys['KeyD'] || keys['ArrowRight']) mx += 1;
+
+          engine.applyInputFrame({
+            move: [mx, mz],
+            cam_yaw_deg: 0,
+            interact: Boolean(keys['KeyE']),
+            pulse: Boolean(keys['Space'] || keys['KeyF'])
+          });
+
+          const events = engine.step();
+          for (const evt of events) {
+            if (evt.name === 'pulse') {
+              pulseAnim = 1.0;
+              pulseRing.position.set(engine.player.pos[0], 0.05, engine.player.pos[2]);
+            }
+          }
+        }
+        accumulator -= dt;
+      }
+
+      // Sync player mesh
+      playerGroup.position.set(engine.player.pos[0], engine.player.pos[1], engine.player.pos[2]);
+
+      // Camera follow (Third person)
+      camera.position.set(
+        engine.player.pos[0],
+        engine.player.pos[1] + 8,
+        engine.player.pos[2] - 12
+      );
+      camera.lookAt(engine.player.pos[0], engine.player.pos[1] + 1.2, engine.player.pos[2]);
+
+      // Pulse ring expansion
+      if (pulseAnim > 0) {
+        pulseAnim -= 0.03;
+        const scale = (1 - pulseAnim) * (engine.tuning.pulse_radius / 0.4);
+        pulseRing.scale.set(scale, scale, 1);
+        pulseRingMat.opacity = pulseAnim;
+      }
+
+      // Sync Lanterns
+      for (const lData of engine.lanterns) {
+        const meshObj = lanternMeshes.find((m) => m.id === lData.id);
+        if (meshObj) {
+          if (lData.lit) {
+            meshObj.lamp.material.color.setHex(0xffd166);
+            meshObj.lamp.material.emissive.setHex(0xff9e00);
+            meshObj.light.intensity = 2.5;
+          } else {
+            meshObj.lamp.material.color.setHex(0x332211);
+            meshObj.lamp.material.emissive.setHex(0x050200);
+            meshObj.light.intensity = 0;
+          }
+        }
+      }
+
+      syncMotes();
+      syncShades();
+
+      // Update HUD
+      document.getElementById('val-flames').textContent = '🔥 '.repeat(Math.max(0, engine.player.flames)) || 'Đã tắt';
+      document.getElementById('val-carried').textContent = `✨ ${engine.player.carried} / ${engine.tuning.carry_capacity}`;
+      const litCount = engine.lanterns.filter((l) => l.lit).length;
+      document.getElementById('val-lanterns').textContent = `🏮 ${litCount} / ${engine.lanterns.length}`;
+      document.getElementById('val-score-time').textContent = `${engine.score} pts · ${Math.ceil(engine.time_left_s)}s`;
+
+      // Check Game Over / Won UI
+      if (engine.state !== 'playing' && overlay.style.display !== 'flex') {
+        overlay.style.display = 'flex';
+        if (engine.state === 'won') {
+          overlayTitle.textContent = '🌟 Chiến Thắng! 🌟';
+          overlayTitle.style.color = '#ffd166';
+          overlayMsg.textContent = `Tuyệt vời! Mọi ngọn đèn đã được thắp sáng. Điểm số: ${engine.score}`;
+        } else {
+          overlayTitle.textContent = '💀 Thất Bại';
+          overlayTitle.style.color = '#ff6b6b';
+          overlayMsg.textContent = engine.player.flames <= 0 ? 'Bóng Mực đã cướp hết ngọn lửa của Mây!' : 'Bình minh đã đến trước khi kịp thắp đèn!';
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
