@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 
-test('Test Contract v1.1: Mote Pickup Scenario', () => {
+test('Test Contract v1.2: Mote Pickup Scenario', () => {
   const outPath = 'tests/output_pickup.jsonl';
   if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
 
@@ -36,7 +36,7 @@ test('Test Contract v1.1: Mote Pickup Scenario', () => {
   assert.equal(endLine.state, 'playing');
 });
 
-test('Test Contract v1.1: Deposit and Win Scenario (Ticket-02 lantern_cost = 10)', () => {
+test('Test Contract v1.2: Deposit and Lantern Lit Scenario (Phase 3: no early win)', () => {
   const outPath = 'tests/output_deposit.jsonl';
   if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
 
@@ -52,28 +52,21 @@ test('Test Contract v1.1: Deposit and Win Scenario (Ticket-02 lantern_cost = 10)
   const depEvt = objects.find((o) => o.type === 'event' && o.name === 'deposit');
   assert.ok(depEvt, 'deposit event should be emitted');
   assert.equal(depEvt.data.lantern_id, 'L1');
-  // Ticket-02 standard numbers: lantern_cost is now 10 motes
   assert.equal(depEvt.data.amount, 10);
 
   const litEvt = objects.find(
     (o) => o.type === 'event' && o.name === 'lantern_lit'
   );
   assert.ok(litEvt, 'lantern_lit event should be emitted');
+  assert.equal(litEvt.data.relight, false);
 
-  const winEvt = objects.find(
-    (o) => o.type === 'event' && o.name === 'game_over'
-  );
-  assert.ok(winEvt, 'game_over won event should be emitted');
-  assert.equal(winEvt.data.result, 'won');
-  assert.equal(winEvt.data.reason, 'all_lit');
-
+  // Phase 3 breaking change: No early win on lighting all lanterns. Game continues until dawn_survived!
   const endLine = objects[objects.length - 1];
   assert.equal(endLine.type, 'end');
-  assert.equal(endLine.state, 'won');
-  assert.ok(endLine.score > 100);
+  assert.equal(endLine.state, 'playing');
 });
 
-test('Test Contract v1.1: Pulse Stuns Shade Scenario (Ticket-02 pulse_cost = 3)', () => {
+test('Test Contract v1.2: Pulse Stuns Shade Scenario', () => {
   const outPath = 'tests/output_pulse.jsonl';
   if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
 
@@ -92,13 +85,12 @@ test('Test Contract v1.1: Pulse Stuns Shade Scenario (Ticket-02 pulse_cost = 3)'
   assert.ok(pulseEvt, 'pulse event should be emitted');
   assert.deepEqual(pulseEvt.data.stunned_ids, ['S1']);
 
-  // Shade should have been pushed back and stunned
   const lateSnap = objects.filter((o) => o.type === 'snapshot').pop();
   assert.equal(lateSnap.shades[0].state, 'stunned');
   assert.ok(lateSnap.shades[0].pos[2] > 4.0, 'Shade should be pushed back');
 });
 
-test('Test Contract v1.1: Determinism across runs', () => {
+test('Test Contract v1.2: Determinism across runs', () => {
   const out1 = 'tests/out_det1.jsonl';
   const out2 = 'tests/out_det2.jsonl';
 
@@ -119,7 +111,7 @@ test('Test Contract v1.1: Determinism across runs', () => {
   );
 });
 
-test('Test Contract v1.1: Error exit code 2 on invalid JSON input', () => {
+test('Test Contract v1.2: Error exit code 2 on invalid JSON input', () => {
   const badPath = 'tests/bad.json';
   fs.writeFileSync(badPath, '{ invalid json');
   try {

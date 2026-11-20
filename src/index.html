@@ -252,6 +252,7 @@
     <h1>Tạm Dừng</h1>
     <p>Game đang tạm dừng logic. Nhấn ESC hoặc P để tiếp tục.</p>
     <button class="btn" id="btn-resume">Tiếp Tục</button>
+    <button class="btn btn-secondary" id="btn-colorblind">Chế Độ Mù Màu: TẮT</button>
     <button class="btn btn-secondary" id="btn-restart-night">Chơi Lại Đêm Này</button>
     <button class="btn btn-secondary" id="btn-to-menu">Về Menu Chọn Đêm</button>
   </div>
@@ -408,8 +409,21 @@
     const drifterMeshMap = new Map();
     const charmMeshMap = new Map();
 
-    function syncLanterns() {
-      // Rebuild if count changed
+    let colorblindMode = localStorage.getItem('dao_colorblind') === 'true';
+
+    function updateColorblindUI() {
+      const btn = document.getElementById('btn-colorblind');
+      if (btn) btn.textContent = `Chế Độ Mù Màu: ${colorblindMode ? 'BẬT' : 'TẮT'}`;
+    }
+    updateColorblindUI();
+
+    document.getElementById('btn-colorblind').onclick = () => {
+      colorblindMode = !colorblindMode;
+      localStorage.setItem('dao_colorblind', String(colorblindMode));
+      updateColorblindUI();
+    };
+
+    function syncLanterns(now = 0) {
       if (lanternMeshes.length !== engine.lanterns.length) {
         lanternMeshes.forEach((m) => scene.remove(m.group));
         lanternMeshes = [];
@@ -444,10 +458,24 @@
         const m = lanternMeshes.find((item) => item.id === lData.id);
         if (m) {
           if (lData.lit) {
+            m.lamp.scale.set(1, 1, 1);
             m.lamp.material.color.setHex(0xFFB347);
-            m.lamp.material.emissive.setHex(0xFFE9B0);
-            m.light.intensity = 2.5;
+            if (lData.fuel < 30) {
+              // 1 Hz blink when fuel < 30
+              const blink = Math.sin(now * 0.006) > 0;
+              m.lamp.material.emissive.setHex(blink ? 0xFFE9B0 : 0x442200);
+              m.light.intensity = blink ? 2.5 : 0.6;
+            } else {
+              m.lamp.material.emissive.setHex(0xFFE9B0);
+              m.light.intensity = 2.5;
+            }
           } else {
+            // Deflated by 20% in colorblind mode
+            if (colorblindMode) {
+              m.lamp.scale.set(1, 0.8, 1);
+            } else {
+              m.lamp.scale.set(1, 1, 1);
+            }
             m.lamp.material.color.setHex(0x5B5F6E);
             m.lamp.material.emissive.setHex(0x050200);
             m.light.intensity = 0;
@@ -488,7 +516,7 @@
 
       engine = new GameEngine({ night: currentNight });
       buildMap(currentNight);
-      syncLanterns();
+      syncLanterns(now);
       document.getElementById('lbl-night').textContent =
         currentNight === 1 ? 'Đêm 1 — Đảo Bến' : currentNight === 2 ? 'Đêm 2 — Đảo Cau' : 'Đêm 3 — Đảo Chuông';
       document.getElementById('menu-overlay').style.display = 'none';
@@ -559,7 +587,7 @@
       const litLanternCount = engine.lanterns.filter((l) => l.lit).length;
       ambientLight.intensity = 0.15 + 0.55 * (litLanternCount / (engine.lanterns.length || 1));
 
-      syncLanterns();
+      syncLanterns(now);
 
       // Sync Motes
       const activeMoteIds = new Set(engine.motes.map((m) => m.id));
@@ -595,11 +623,16 @@
         if (!mesh) {
           mesh = new THREE.Mesh(
             new THREE.DodecahedronGeometry(0.7, 1),
-            new THREE.MeshStandardMaterial({ color: 0x120A1A, emissive: 0x7A3CFF, emissiveIntensity: 0.6 })
+            new THREE.MeshStandardMaterial({
+              color: 0x120A1A,
+              emissive: colorblindMode ? 0x00B3FF : 0x7A3CFF,
+              emissiveIntensity: 0.6
+            })
           );
           scene.add(mesh);
           shadeMeshMap.set(s.id, mesh);
         }
+        mesh.material.emissive.setHex(colorblindMode ? 0x00B3FF : 0x7A3CFF);
         mesh.position.set(s.pos[0], s.pos[1] + 0.7, s.pos[2]);
       }
 
@@ -654,8 +687,33 @@
         timerEl.classList.remove('timer-danger');
       }
 
+      const neededLit = Math.ceil(engine.tuning.win_ratio * engine.lanterns.length);
       document.getElementById('val-lanterns-score').textContent =
-        `🏮 ${litLanternCount} / ${engine.lanterns.length} · ${engine.score} pts`;
+        `🏮 ${litLanternCount} / ${engine.lanterns.length} (Cần ${neededLit}) · ${engine.score} pts`;
+
+      // Contextual prompt banner
+      const banner = document.getElementById('prompt-banner');
+      let nearLantern = null;
+      for (const l of engine.lanterns) {
+        if (dist2D(engine.player.pos, l.pos) <= engine.tuning.interact_radius) {
+          nearLantern = l;
+          break;
+        }
+      }
+      if (nearLantern) {
+        banner.style.display = 'block';
+        if (!nearLantern.lit) {
+          banner.textContent = nearLantern.ever_lit
+            ? `E — Thắp lại đèn (${engine.player.carried}/5)`
+            : `E — Thắp đèn (${engine.player.carried}/10)`;
+        } else if (nearLantern.fuel < 100) {
+          banner.textContent = `E — Châm thêm dầu (${Math.ceil(nearLantern.fuel)}/100)`;
+        } else {
+          banner.style.display = 'none';
+        }
+      } else {
+        banner.style.display = 'none';
+      }
 
       // Update 10-slot mote bar
       const slots = document.querySelectorAll('.mote-slot');
